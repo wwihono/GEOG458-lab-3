@@ -29,12 +29,17 @@
             'pk.eyJ1Ijoid2luc3R3MiIsImEiOiJjbWt5cm11djkwYW5xM2Zvam40MW05aG96In0.XgSPU6D4f-QStbCZyqGJCw';
         let map = new mapboxgl.Map({
             container: 'map', // container ID
-            style: 'mapbox://styles/mapbox/dark-v10',
-            zoom: 5, // starting zoom
-            minZoom: 4, // minimum zoom level of the map
-            center: [138, 38] // starting center
+            style: 'mapbox://styles/mapbox/light-v10',
+            zoom: 3, // starting zoom
+            center: [-100, 40] // starting center
         });
     </script>
+    <div class='map-overlay' id='features'>
+
+    </div>
+    <div class='map-overlay' id='legend'>
+
+    </div>
 
 </body>
 
