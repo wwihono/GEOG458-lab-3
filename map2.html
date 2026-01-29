@@ -1,31 +1,174 @@
 <!DOCTYPE html>
 <html>
-
 <head>
   <meta charset="utf-8" />
-  <title>Proportional Symbols — COVID Counts</title>
+  <title>Map 2 — COVID-19 Counts (Proportional Symbols)</title>
   <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
 
-  <!-- Mapbox GL -->
   <link href="https://api.mapbox.com/mapbox-gl-js/v2.8.1/mapbox-gl.css" rel="stylesheet" />
   <script src="https://api.mapbox.com/mapbox-gl-js/v2.8.1/mapbox-gl.js"></script>
 
-  <!-- Turf.js (needed if your main.js converts polygons to points) -->
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
 
-  <!-- Your CSS -->
-  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    html, body { height: 100%; margin: 0; padding: 0; }
+    #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+
+    .map-overlay {
+      position: absolute;
+      background: rgba(255,255,255,0.92);
+      font: 12px/18px Arial, sans-serif;
+      padding: 10px;
+      margin: 10px;
+      border-radius: 4px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+    }
+    #legend { bottom: 0; left: 0; }
+  </style>
 </head>
 
 <body>
-  <!-- Map container -->
   <div id="map"></div>
+  <div class="map-overlay" id="legend"></div>
 
-  <!-- Legend container (main.js will fill this) -->
-  <div id="legend"></div>
+  <script>
+    mapboxgl.accessToken = 'pk.eyJ1Ijoid2luc3R3MiIsImEiOiJjbWt5cm11djkwYW5xM2Zvam40MW05aG96In0.XgSPU6D4f-QStbCZyqGJCw';
 
-  <!-- Your shared JS (contains logic for map1 + map2) -->
-  <script src="js/main.js"></script>
+    const COUNTS_URL = 'assets/us-covid-2020-counts.json';
+
+    const map = new mapboxgl.Map({
+      container: 'map',
+      style: 'mapbox://styles/mapbox/dark-v10',
+      center: [-96, 37.8],
+      zoom: 3.6,
+      projection: 'albers'
+    });
+
+    let hoveredId = null;
+    let popup = null;
+
+    map.on('load', async () => {
+      const resp = await fetch(COUNTS_URL);
+      const counties = await resp.json();
+
+      const points = {
+        type: 'FeatureCollection',
+        features: counties.features.map(f => {
+          const pt = turf.pointOnFeature(f);
+          pt.properties = f.properties || {};
+          return pt;
+        })
+      };
+
+      map.addSource('counts', {
+        type: 'geojson',
+        data: points,
+        promoteId: 'fips'
+      });
+
+      map.addLayer({
+        id: 'count-circles',
+        type: 'circle',
+        source: 'counts',
+        paint: {
+          // circle size based on cases
+          'circle-radius': [
+            'interpolate', ['linear'],
+            ['sqrt', ['coalesce', ['get', 'cases'], 0]],
+            0, 2,
+            800000, 40
+          ],
+          'circle-color': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false],
+            '#ffcc00',
+            'rgba(33,113,181,0.8)'
+          ],
+          'circle-stroke-color': 'white',
+          'circle-stroke-width': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false],
+            2,
+            0.6
+          ],
+          'circle-opacity': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false],
+            0.95,
+            0.7
+          ]
+        }
+      });
+
+      // Hover popup 
+      map.on('mousemove', 'count-circles', (e) => {
+        map.getCanvas().style.cursor = 'pointer';
+
+        const f = e.features && e.features[0];
+        if (!f) return;
+
+        const id = f.properties.fips;
+
+        if (hoveredId !== null && hoveredId !== id) {
+          map.setFeatureState({ source: 'counts', id: hoveredId }, { hover: false });
+        }
+        hoveredId = id;
+        map.setFeatureState({ source: 'counts', id: hoveredId }, { hover: true });
+
+        const p = f.properties;
+
+        const html = `
+          <strong>${p.county ?? 'Unknown'}, ${p.state ?? ''}</strong><br/>
+          Cases: ${Number(p.cases ?? 0).toLocaleString()}<br/>
+          Deaths: ${Number(p.deaths ?? 0).toLocaleString()}
+        `;
+
+        if (popup) popup.remove();
+        popup = new mapboxgl.Popup({ closeButton: false, closeOnClick: false })
+          .setLngLat(e.lngLat)
+          .setHTML(html)
+          .addTo(map);
+      });
+
+      map.on('mouseleave', 'count-circles', () => {
+        map.getCanvas().style.cursor = '';
+
+        if (hoveredId !== null) {
+          map.setFeatureState({ source: 'counts', id: hoveredId }, { hover: false });
+        }
+        hoveredId = null;
+
+        if (popup) popup.remove();
+      });
+
+      buildPropLegend();
+    });
+
+    function buildPropLegend() {
+      const legend = document.getElementById('legend');
+      const values = [2000, 10000, 50000, 200000, 700000];
+
+      legend.innerHTML = '<strong>Cases (count)</strong>';
+
+      values.forEach(v => {
+        const size = Math.sqrt(v) * 0.046 * 2;
+
+        legend.innerHTML += `
+          <div style="display:flex; align-items:center; margin:6px 0;">
+            <span style="
+              width:${size}px;
+              height:${size}px;
+              border-radius:50%;
+              background:rgba(33,113,181,0.8);
+              border:1px solid #fff;
+              display:inline-block;
+              margin-right:10px;
+            "></span>
+            ${v.toLocaleString()}
+          </div>
+        `;
+      });
+    }
+  </script>
 </body>
-
 </html>

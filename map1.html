@@ -38,7 +38,7 @@
       style: 'mapbox://styles/mapbox/light-v11',
       center: [-96, 37.8],
       zoom: 3.6,
-      projection: 'albers' // ✅ correct
+      projection: 'albers' 
     });
 
     let countyData = null;
@@ -49,7 +49,7 @@
     }
 
     map.on('load', async () => {
-      await geojsonFetch(); // ✅ wait until countyData exists
+      await geojsonFetch(); 
 
       map.addSource('countyData', {
         type: 'geojson',
@@ -137,12 +137,39 @@
         featuresBox.innerHTML = '<strong>Hover a county</strong>';
       });
 
-      // Simple legend
-      document.getElementById('legend').innerHTML = `
-        <strong>Cases per 1,000</strong><br/>
-        0–10<br/>10–25<br/>25–50<br/>50–75<br/>75–100<br/>100–150<br/>150+
-      `;
-    });
+      const breaks = [0, 10, 25, 50, 75, 100, 150];
+      const colors = [
+        '#ffffcc',
+        '#ffeda0',
+        '#fed976',
+        '#feb24c',
+        '#fd8d3c',
+        '#f03b20',
+        '#bd0026'
+      ];
+
+      const legend = document.getElementById('legend');
+      legend.innerHTML = '<strong>Cases per 1,000</strong>';
+
+      for (let i = 0; i < breaks.length; i++) {
+        const next = breaks[i + 1];
+
+        legend.innerHTML += `
+          <div style="display:flex;align-items:center;margin:4px 0;">
+            <span style="
+              background:${colors[i]};
+              width:18px;
+              height:18px;
+              display:inline-block;
+              margin-right:8px;
+              border:1px solid #999;
+            "></span>
+            ${breaks[i]}${next ? ' – ' + next : '+'}
+          </div>
+        `;
+      }
+
+      });
   </script>
 </body>
 
