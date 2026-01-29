@@ -27,7 +27,7 @@ body {
 /* the layout of the legend panel */
 #legend {
     position: absolute;
-    bottom: 0;
+    bottom: 150px;
     right: 0;
     width: 110px;
     background: #fff;
