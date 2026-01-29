@@ -2,174 +2,146 @@
 <html>
 
 <head>
-  <meta charset="utf-8" />
-  <title>COVID-19 Rates (2020)</title>
-  <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <meta charset="utf-8">
+  <title>Map 1 — COVID-19 Rates Choropleth</title>
+  <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
 
-  <link href="https://fonts.googleapis.com/css2?family=Open+Sans&display=swap" rel="stylesheet">
-  <link href="https://api.mapbox.com/mapbox-gl-js/v2.8.1/mapbox-gl.css" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css" />
-
+  <link href="https://api.mapbox.com/mapbox-gl-js/v2.8.1/mapbox-gl.css" rel="stylesheet">
   <script src="https://api.mapbox.com/mapbox-gl-js/v2.8.1/mapbox-gl.js"></script>
+
+  <style>
+    html, body { height: 100%; margin: 0; padding: 0; }
+    #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+    .map-overlay {
+      position: absolute;
+      background: rgba(255,255,255,0.9);
+      font: 12px/18px Arial, sans-serif;
+      padding: 10px;
+      margin: 10px;
+      border-radius: 4px;
+    }
+    #features { top: 0; left: 0; max-width: 260px; }
+    #legend { bottom: 0; left: 0; }
+  </style>
 </head>
 
 <body>
   <div id="map"></div>
-
-  <div class="map-overlay" id="features">
-    <h2>COVID-19 Rates by County (2020)</h2>
-    <div id="pd"><p>Hover over a county</p></div>
-  </div>
-
+  <div class="map-overlay" id="features"><strong>Hover a county</strong></div>
   <div class="map-overlay" id="legend"></div>
 
   <script>
-    mapboxgl.accessToken =
-      'pk.eyJ1Ijoid2luc3R3MiIsImEiOiJjbWt5cm11djkwYW5xM2Zvam40MW05aG96In0.XgSPU6D4f-QStbCZyqGJCw';
+    mapboxgl.accessToken = 'pk.eyJ1Ijoid2luc3R3MiIsImEiOiJjbWt5cm11djkwYW5xM2Zvam40MW05aG96In0.XgSPU6D4f-QStbCZyqGJCw';
 
     const map = new mapboxgl.Map({
-        container: 'map',
-        style: 'mapbox://styles/mapbox/light-v11', // light works better for choropleths
-        center: [-96, 37.8],
-        zoom: 3.6,
-        minZoom: 3,
-        projection: {
-            name: 'albers'
-        }
+      container: 'map',
+      style: 'mapbox://styles/mapbox/light-v11',
+      center: [-96, 37.8],
+      zoom: 3.6,
+      projection: 'albers' // ✅ correct
     });
 
+    let countyData = null;
 
-    // Choropleth breaks (rate per 1,000 people)
-    const breaks = [0, 20, 40, 60, 80, 100, 150, 200, 250];
-    const colors = [
-      '#f7fbff',
-      '#deebf7',
-      '#c6dbef',
-      '#9ecae1',
-      '#6baed6',
-      '#4292c6',
-      '#2171b5',
-      '#08519c',
-      '#08306b'
-    ];
-
-    // Build legend
-    const legend = document.getElementById('legend');
-    legend.innerHTML = '<strong>Rate (per 1,000)</strong><br>';
-    for (let i = 0; i < breaks.length - 1; i++) {
-      const from = breaks[i];
-      const to = breaks[i + 1];
-      const key = document.createElement('div');
-      key.className = 'break';
-      key.innerHTML =
-        '<span class="legend-key" style="background:' + colors[i] + '"></span>' +
-        from + '–' + to;
-      legend.appendChild(key);
+    async function geojsonFetch() {
+      const response = await fetch('assets/us-covid-2020-rates.geojson');
+      countyData = await response.json();
     }
-    const last = document.createElement('div');
-    last.className = 'break';
-    last.innerHTML =
-      '<span class="legend-key" style="background:' + colors[colors.length - 1] + '"></span>' +
-      breaks[breaks.length - 1] + '+';
-    legend.appendChild(last);
 
-    map.on('load', () => {
-      map.addSource('covid', {
+    map.on('load', async () => {
+      await geojsonFetch(); // ✅ wait until countyData exists
+
+      map.addSource('countyData', {
         type: 'geojson',
-        data: 'assets/us-covid-2020-rates.geojson',
-        generateId: true
+        data: countyData,
+        promoteId: 'fips'
       });
 
+      // Choropleth based on `rates` (cases per 1,000)
       map.addLayer({
-        id: 'covid-fill',
+        id: 'county-fill',
         type: 'fill',
-        source: 'covid',
+        source: 'countyData',
         paint: {
           'fill-color': [
             'step',
             ['get', 'rates'],
-            colors[0],
-            breaks[1], colors[1],
-            breaks[2], colors[2],
-            breaks[3], colors[3],
-            breaks[4], colors[4],
-            breaks[5], colors[5],
-            breaks[6], colors[6],
-            breaks[7], colors[7],
-            breaks[8], colors[8]
+            '#ffffcc',
+            10, '#ffeda0',
+            25, '#fed976',
+            50, '#feb24c',
+            75, '#fd8d3c',
+            100, '#f03b20',
+            150, '#bd0026'
           ],
           'fill-opacity': [
             'case',
             ['boolean', ['feature-state', 'hover'], false],
-            0.9,
-            0.7
+            0.95,
+            0.75
           ]
         }
       });
 
+      // Hover outline
       map.addLayer({
-        id: 'covid-outline',
+        id: 'county-outline',
         type: 'line',
-        source: 'covid',
+        source: 'countyData',
         paint: {
-          'line-color': '#444',
-          'line-width': 0.2
+          'line-color': '#000',
+          'line-width': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false],
+            2,
+            0.2
+          ]
         }
       });
 
-      const popup = new mapboxgl.Popup({
-        closeButton: false,
-        closeOnClick: false
-      });
-
+      // Hover interaction
+      const featuresBox = document.getElementById('features');
       let hoveredId = null;
 
-      map.on('mousemove', 'covid-fill', (e) => {
+      map.on('mousemove', 'county-fill', (e) => {
         map.getCanvas().style.cursor = 'pointer';
 
-        if (!e.features || !e.features.length) return;
+        const f = e.features && e.features[0];
+        if (!f) return;
 
-        // hover styling
-        if (hoveredId !== null) {
-          map.setFeatureState({ source: 'covid', id: hoveredId }, { hover: false });
+        const id = f.properties.fips;
+
+        if (hoveredId !== null && hoveredId !== id) {
+          map.setFeatureState({ source: 'countyData', id: hoveredId }, { hover: false });
         }
-        hoveredId = e.features[0].id;
-        map.setFeatureState({ source: 'covid', id: hoveredId }, { hover: true });
+        hoveredId = id;
+        map.setFeatureState({ source: 'countyData', id: hoveredId }, { hover: true });
 
-        const props = e.features[0].properties;
-        const county = props.county;
-        const state = props.state;
-        const rate = Number(props.rates).toFixed(1);
-        const cases = props.cases;
-        const deaths = props.deaths;
-
-        document.getElementById('pd').innerHTML =
-          '<h3>' + county + ', ' + state + '</h3>' +
-          '<p><strong>Rate:</strong> ' + rate + ' per 1,000</p>' +
-          '<p><strong>Cases:</strong> ' + cases + '<br><strong>Deaths:</strong> ' + deaths + '</p>';
-
-        popup
-          .setLngLat(e.lngLat)
-          .setHTML(
-            '<strong>' + county + ', ' + state + '</strong><br>' +
-            'Rate: ' + rate + ' per 1,000'
-          )
-          .addTo(map);
+        const p = f.properties;
+        featuresBox.innerHTML = `
+          <strong>${p.county}, ${p.state}</strong><br/>
+          Rate: ${Number(p.rates).toFixed(1)} per 1,000<br/>
+          Cases: ${Number(p.cases).toLocaleString()}<br/>
+          Deaths: ${Number(p.deaths).toLocaleString()}
+        `;
       });
 
-      map.on('mouseleave', 'covid-fill', () => {
+      map.on('mouseleave', 'county-fill', () => {
         map.getCanvas().style.cursor = '';
-        popup.remove();
 
         if (hoveredId !== null) {
-          map.setFeatureState({ source: 'covid', id: hoveredId }, { hover: false });
+          map.setFeatureState({ source: 'countyData', id: hoveredId }, { hover: false });
         }
         hoveredId = null;
 
-        document.getElementById('pd').innerHTML = '<p>Hover over a county</p>';
+        featuresBox.innerHTML = '<strong>Hover a county</strong>';
       });
 
-      map.on('error', (e) => console.error('Mapbox error:', e && e.error ? e.error : e));
+      // Simple legend
+      document.getElementById('legend').innerHTML = `
+        <strong>Cases per 1,000</strong><br/>
+        0–10<br/>10–25<br/>25–50<br/>50–75<br/>75–100<br/>100–150<br/>150+
+      `;
     });
   </script>
 </body>
